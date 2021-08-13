@@ -2,7 +2,11 @@ import scipy.special as sc
 import scipy.integrate as ig
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
+EPSILON = 0.0000000000005
+UPPER_LIMIT = 3 + EPSILON
+LOWER_LIMIT = 3 - EPSILON
 
 def pearson_function(x, beta, sigma):
     """ Calculation of the Pearson Function
@@ -20,23 +24,22 @@ def pearson_function(x, beta, sigma):
     """
     if beta < 2:
         return 0
-    elif beta < 3:
-        m = ((5 * beta) - 9) / (6 - (2 * beta))
-        a = np.sqrt((2 * m) + 3) * sigma
+    elif beta < LOWER_LIMIT:
+        m = (5*beta - 9) / (6 - 2*beta)
+        a = np.sqrt(2*m + 3) * sigma
         beta_func = sc.beta(0.5, m + 0.5)
-        fract = np.square(x / a)
+        fract = (x/a) ** 2
         san_fract = np.where(np.greater(fract, 1), 1, fract)
-        # f = np.where(np.greater_equal(fract, 1), 0, ((m + 0.5) / (np.pi * a)) * beta_func * np.power((1 - fract), m))
-        f = ((m + 0.5) / (np.pi * a)) * beta_func * np.power((1 - san_fract), m)
-    elif beta == 3:
+        f = ((m+0.5) / (np.pi*a)) * beta_func * ((1-san_fract) ** m)
+    elif np.abs(beta - 3) < EPSILON:
         # maybe use a constant for sqrt(2) and sqrt(pi)
         a = np.sqrt(2) * sigma
-        f = (1 / (np.sqrt(np.pi) * a)) * np.exp(- np.square(x / a))
+        f = (1 / (np.sqrt(np.pi) * a)) * np.exp(-(x/a)**2)
     else:
-        m = (5 * beta - 9) / (6 - 2 * beta)
-        a = np.sqrt(np.abs(2 * m + 3)) * sigma
+        m = (5*beta - 9) / (6 - 2*beta)
+        a = np.sqrt(np.abs(2*m + 3)) * sigma
         beta_func = sc.beta(0.5, np.abs(m))
-        f = (np.abs(m + 0.5) / (np.pi * a)) * beta_func * np.power((1 + np.square(x / a)), m)
+        f = (np.abs(m+0.5) / (np.pi*a)) * beta_func * ((1 + (x/a)**2) ** m)
     return f
 
 
@@ -54,32 +57,38 @@ def pearson_function_fast(x, beta, sigma):
     :return: the probability values
     :rtype: ndarray
     """
-    beta_between_2_3 = np.logical_and(np.greater_equal(beta, 2), np.less(beta, 3))
-    beta_eq_3 = np.equal(beta, 3)
-    beta_gt_3 = np.greater(beta, 3)
+    beta_between_2_3 = np.logical_and(np.greater_equal(beta, 2),
+                                      np.less(beta, LOWER_LIMIT))
+    beta_eq_3 = np.less(np.abs(beta - 3), EPSILON)
+    beta_gt_3 = np.greater(beta, UPPER_LIMIT)
+
 
     # not the most beautiful solution
-    beta_san = np.where(beta_eq_3, 0, beta)
-    m = np.where(beta_eq_3, 0, (5 * beta_san - 9) / (6 - 2 * beta_san))
+    beta_san = np.where(np.equal(beta, 3), 0, beta)
+    m = np.where(beta_eq_3, 0, (5*beta_san - 9) / (6 - 2*beta_san))
 
     a = np.where(beta_eq_3, np.sqrt(2) * sigma,
                  sigma * np.sqrt(np.where(
                      beta_gt_3,
-                     np.abs(2 * m + 3),
-                     2 * m + 3))
+                     np.abs(2*m + 3),
+                     2*m + 3))
                  )
 
     beta_func = np.where(beta_between_2_3, sc.beta(0.5, m + 0.5),
                          np.where(beta_gt_3, sc.beta(0.5, np.abs(m)), 0))
 
-    fract = np.square(x / a)
+    fract = (x/a) ** 2
 
-    san_fract = np.where(beta_between_2_3, np.where(np.greater(fract, 1), 1, fract), fract)
+    san_fract = np.where(beta_between_2_3,
+                         np.where(np.greater(fract, 1), 1, fract), fract)
 
-    f = np.where(beta_between_2_3, ((m + 0.5) / (np.pi * a)) * beta_func * np.power((1 - san_fract), m),
-                 np.where(beta_eq_3, (1 / (np.sqrt(np.pi) * a)) * np.exp(- san_fract),
+    f = np.where(beta_between_2_3,
+                 ((m+0.5) / (np.pi*a)) * beta_func * ((1-san_fract) ** m),
+                 np.where(beta_eq_3, (1 / ((np.pi ** 2) * a))
+                          * np.exp(-san_fract),
                           np.where(beta_gt_3,
-                                   (np.abs(m + 0.5) / (np.pi * a)) * beta_func * np.power((1 + san_fract), m),
+                                   (np.abs(m+0.5) / (np.pi*a))
+                                   * beta_func * ((1+san_fract) ** m),
                                    np.NaN)))
 
     return f
@@ -96,14 +105,19 @@ def test_pearson_function():
             test3 = ig.quad(beta_test, -np.inf, np.inf, (beta, sigma))
 
             print("beta: " + str(beta) + "  sigma: " + str(sigma))
-            print("should be 1: " + str(test1[0]) + " deviation: " + str(test1[1]))
-            print("should be " + str(sigma ** 2) + ": " + str(test2[0]) + " deviation: " + str(test2[1]))
-            print("should be " + str(beta) + ": " + str(test3[0] / (sigma ** 4)) +
-                  " deviation: " + str(test3[1] / sigma ** 4))
+            print("should be 1: " + str(test1[0])
+                  + " deviation: " + str(test1[1]))
+            print("should be " + str(sigma ** 2) + ": " + str(test2[0])
+                  + " deviation: " + str(test2[1]))
+            print("should be " + str(beta) + ": " +
+                  str(test3[0] / (sigma ** 4))
+                  + " deviation: " + str(test3[1] / sigma ** 4))
 
             assert 1 >= (test1[0] - test1[1]) or (test1[0] + test1[1]) >= 1
-            assert sigma ** 2 >= (test2[0] - test2[1]) or (test2[0] + test2[1]) >= sigma ** 2
-            assert (sigma ** 4) * beta >= (test3[0] - test3[1]) or (test3[0] + test3[1]) >= (sigma ** 4) * beta
+            assert sigma ** 2 >= (test2[0] - test2[1]) \
+                   or (test2[0] + test2[1]) >= sigma ** 2
+            assert (sigma ** 4) * beta >= (test3[0] - test3[1]) \
+                   or (test3[0] + test3[1]) >= (sigma ** 4) * beta
             print("Test passed\n")
     print("ALL TESTS PASSED")
 
@@ -120,7 +134,7 @@ def plot_pearson_3d(x, sigma):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
-    beta = np.arange(2, 20, 0.01)
+    beta = np.arange(2, 3.5, 0.001)
     xx, bb = np.meshgrid(x, beta, sparse=True)
 
     f = pearson_function_fast(xx, bb, sigma)
@@ -145,7 +159,8 @@ def plot_pearson(x, beta, sigma):
 
 
 if __name__ == "__main__":
-    test_pearson_function()
-    x_values = np.arange(-3, 3, 0.1)
-    plot_pearson_3d(x_values, 0.5)
+    #test_pearson_function()
+    x_values = np.arange(-3, 3, 0.01)
+    plot_pearson_3d(x_values, 0.75)
+    #plot_pearson(x_values, 2.5, 1)
     print("done")
