@@ -1,3 +1,4 @@
+import scipy.interpolate
 import scipy.special as sc
 import scipy.integrate as ig
 import numpy as np
@@ -7,6 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 EPSILON = 0.0000000000005
 UPPER_LIMIT = 3 + EPSILON
 LOWER_LIMIT = 3 - EPSILON
+
 
 def pearson_function(x, beta, sigma):
     """ Calculation of the Pearson Function
@@ -25,21 +27,22 @@ def pearson_function(x, beta, sigma):
     if beta < 2:
         return 0
     elif beta < LOWER_LIMIT:
-        m = (5*beta - 9) / (6 - 2*beta)
-        a = np.sqrt(2*m + 3) * sigma
+        m = (5 * beta - 9) / (6 - 2 * beta)
+        a = np.sqrt(2 * m + 3) * sigma
         beta_func = sc.beta(0.5, m + 0.5)
-        fract = (x/a) ** 2
+        fract = (x / a) ** 2
         san_fract = np.where(np.greater(fract, 1), 1, fract)
-        f = ((m+0.5) / (np.pi*a)) * beta_func * ((1-san_fract) ** m)
+        f = ((m + 0.5) / (np.pi * a)) * beta_func * ((1 - san_fract) ** m)
     elif np.abs(beta - 3) < EPSILON:
         # maybe use a constant for sqrt(2) and sqrt(pi)
         a = np.sqrt(2) * sigma
-        f = (1 / (np.sqrt(np.pi) * a)) * np.exp(-(x/a)**2)
+        f = (1 / (np.sqrt(np.pi) * a)) * np.exp(-(x / a) ** 2)
     else:
-        m = (5*beta - 9) / (6 - 2*beta)
-        a = np.sqrt(np.abs(2*m + 3)) * sigma
+        m = (5 * beta - 9) / (6 - 2 * beta)
+        a = np.sqrt(np.abs(2 * m + 3)) * sigma
         beta_func = sc.beta(0.5, np.abs(m))
-        f = (np.abs(m+0.5) / (np.pi*a)) * beta_func * ((1 + (x/a)**2) ** m)
+        f = (np.abs(m + 0.5) / (np.pi * a)) * beta_func * (
+                    (1 + (x / a) ** 2) ** m)
     return f
 
 
@@ -47,7 +50,7 @@ def pearson_function_fast(x, beta, sigma):
     """ Calculation of the Pearson Function with whole-array operations
 
     :param x:
-    :param beta: kurtoses
+    :param beta: kurtosis
     :param sigma: standard deviation
 
     :type x: ndarray
@@ -62,34 +65,35 @@ def pearson_function_fast(x, beta, sigma):
     beta_eq_3 = np.less(np.abs(beta - 3), EPSILON)
     beta_gt_3 = np.greater(beta, UPPER_LIMIT)
 
-
     # not the most beautiful solution
     beta_san = np.where(np.equal(beta, 3), 0, beta)
-    m = np.where(beta_eq_3, 0, (5*beta_san - 9) / (6 - 2*beta_san))
+    m = np.where(beta_eq_3, 0, (5 * beta_san - 9) / (6 - 2 * beta_san))
 
     a = np.where(beta_eq_3, np.sqrt(2) * sigma,
                  sigma * np.sqrt(np.where(
                      beta_gt_3,
-                     np.abs(2*m + 3),
-                     2*m + 3))
+                     np.abs(2 * m + 3),
+                     2 * m + 3))
                  )
 
     beta_func = np.where(beta_between_2_3, sc.beta(0.5, m + 0.5),
                          np.where(beta_gt_3, sc.beta(0.5, np.abs(m)), 0))
 
-    fract = (x/a) ** 2
+    fract = (x / a) ** 2
 
     san_fract = np.where(beta_between_2_3,
                          np.where(np.greater(fract, 1), 1, fract), fract)
 
-    f = np.where(beta_between_2_3,
-                 ((m+0.5) / (np.pi*a)) * beta_func * ((1-san_fract) ** m),
-                 np.where(beta_eq_3, (1 / ((np.pi ** 2) * a))
-                          * np.exp(-san_fract),
-                          np.where(beta_gt_3,
-                                   (np.abs(m+0.5) / (np.pi*a))
-                                   * beta_func * ((1+san_fract) ** m),
-                                   np.NaN)))
+    with np.errstate(invalid='ignore'):
+        f = np.where(beta_between_2_3,
+                     ((m + 0.5) / (np.pi * a))
+                     * beta_func * ((1 - san_fract) ** m),
+                     np.where(beta_eq_3, (1 / ((np.pi ** 2) * a))
+                              * np.exp(-san_fract),
+                              np.where(beta_gt_3,
+                                       (np.abs(m + 0.5) / (np.pi * a))
+                                       * beta_func * ((1 + san_fract) ** m),
+                                       np.NaN)))
 
     return f
 
@@ -146,7 +150,7 @@ def plot_pearson(x, beta, sigma):
     """ Plots the pearson function
 
     :param x:
-    :param beta: kurtoses
+    :param beta: kurtosis
     :param sigma: standard deviation
 
     :type x: ndarray
@@ -158,9 +162,63 @@ def plot_pearson(x, beta, sigma):
     plt.show()
 
 
+def measurement_fun(x, d=0.5, sigma1=1, sigma2=1):
+    """ Calculation of the measurement function
+
+    :param x:
+    :param d:
+    :param sigma1:
+    :param sigma2:
+
+    :type x: float, ndarray
+    :type d: float
+    :type sigma1: float
+    :type sigma1: float
+
+    :return: the measurement value
+    :rtype: float
+    """
+    with np.errstate(invalid='ignore'):
+        f = d / (np.sqrt(2 * np.pi) * sigma1) \
+            * np.exp(-0.5 * ((x / sigma1) ** 2)) \
+            + (1 - d) * 4 \
+            * np.where(x == 0,
+                       (np.sqrt(np.pi) * sigma2) / 2,
+                       x * sc.kn(1, 2 * x / (np.sqrt(np.pi) * sigma2))) \
+            / ((np.pi * sigma2) ** 2)
+    return f
+
+
+def create_measurement(x, d=0.5, sigma1=1, sigma2=1):
+    """ Calculation of the measurement data
+    Extends the function by flipping it around the y-axis
+
+        :param x:
+        :param d:
+        :param sigma1:
+        :param sigma2:
+
+        :type x: float, ndarray
+        :type d: float
+        :type sigma1: float
+        :type sigma1: float
+
+        :return: the measurement data
+        :rtype: float
+        """
+    x_san = np.where(x > 0, x, x * -1)
+    f = measurement_fun(x_san, d, sigma1, sigma2)
+    return f
+
+
 if __name__ == "__main__":
-    #test_pearson_function()
     x_values = np.arange(-3, 3, 0.01)
+    test_pearson_function()
     plot_pearson_3d(x_values, 0.75)
-    #plot_pearson(x_values, 2.5, 1)
+    plot_pearson(x_values, 2.5, 1)
+    f_meas = create_measurement(x_values)
+    plt.plot(x_values, f_meas)
+    cs = scipy.interpolate.CubicSpline(x_values, np.log(f_meas))
+    plt.plot(x_values, cs(x_values))
+    plt.show()
     print("done")
