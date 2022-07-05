@@ -143,6 +143,10 @@ def plot_pearson_3d(x, sigma):
 
     f = pearson_function_fast(xx, bb, sigma)
     ax.plot_surface(xx, bb, f)
+    ax.set_title("3D Pearson Function")
+    ax.set_xlabel("$x$")
+    ax.set_ylabel(r"$\beta$")
+    ax.set_zlabel("$f(x)$")
     plt.show()
 
 
@@ -159,6 +163,9 @@ def plot_pearson(x, beta, sigma):
     """
     f = pearson_function_fast(x, beta, sigma)
     plt.plot(x, f)
+    plt.title("Pearson function")
+    plt.xlabel("x")
+    plt.ylabel("f(x)")
     plt.show()
 
 
@@ -212,13 +219,26 @@ def create_measurement(x, d=0.5, sigma1=1, sigma2=1):
 
 
 if __name__ == "__main__":
-    x_values = np.arange(-3, 3, 0.01)
+    x_values = np.arange(-4, 4, 0.1)
     test_pearson_function()
     plot_pearson_3d(x_values, 0.75)
     plot_pearson(x_values, 2.5, 1)
     f_meas = create_measurement(x_values)
-    plt.plot(x_values, f_meas)
+    fig, axs = plt.subplots(2)
+    axs[0].plot(x_values, f_meas, linestyle="None", marker="x")
+    axs[0].set(xlim=(-3, 3), ylim=(0, 0.4), )
+    axs[0].grid(True)
+    axs[0].set_title("Measurement data")
+    axs[0].set_xlabel("$x^{exp}$")
+    axs[0].set_ylabel('$f^{exp}(x)$')
+
     cs = scipy.interpolate.CubicSpline(x_values, np.log(f_meas))
-    plt.plot(x_values, cs(x_values))
+    axs[1].plot(x_values, cs(x_values))
+    axs[1].set(xlim=(-1, 1), ylim=(-4, -0.5),)
+    axs[1].grid(True)
+    axs[1].set_title("Spline of measurement data")
+    axs[1].set_xlabel("$x$")
+    axs[1].set_ylabel("log$f(x)$")
+    plt.tight_layout()
     plt.show()
     print("done")
