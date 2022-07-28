@@ -1,6 +1,7 @@
 import scipy.interpolate
 import scipy.special as sc
 import scipy.integrate as ig
+import scipy.optimize as op
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -42,7 +43,7 @@ def pearson_function(x, beta, sigma):
         a = np.sqrt(np.abs(2 * m + 3)) * sigma
         beta_func = sc.beta(0.5, np.abs(m))
         f = (np.abs(m + 0.5) / (np.pi * a)) * beta_func * (
-                    (1 + (x / a) ** 2) ** m)
+                (1 + (x / a) ** 2) ** m)
     return f
 
 
@@ -180,7 +181,7 @@ def measurement_fun(x, d=0.5, sigma1=1, sigma2=1):
     :type x: float, ndarray
     :type d: float
     :type sigma1: float
-    :type sigma1: float
+    :type sigma2: float
 
     :return: the measurement value
     :rtype: float
@@ -208,7 +209,7 @@ def create_measurement(x, d=0.5, sigma1=1, sigma2=1):
         :type x: float, ndarray
         :type d: float
         :type sigma1: float
-        :type sigma1: float
+        :type sigma2: float
 
         :return: the measurement data
         :rtype: float
@@ -218,13 +219,91 @@ def create_measurement(x, d=0.5, sigma1=1, sigma2=1):
     return f
 
 
+def sum_n_pearson(x, par):
+    c, beta, sigma = np.split(par, 3)
+    return np.sum(c * pearson_function_fast(x[:, np.newaxis],
+                                            beta,
+                                            sigma), axis=1)
+
+
+class SumNPearson:
+    def __init__(self, n=3):
+        self.n = n
+        self.params = np.empty(n * 3)
+        self.var_params = np.arange(n * 3)
+
+    def fix_c_i(self, index, value):
+        if index > self.n:
+            raise Exception("Index out of range")
+        self.params[index] = value
+        self.var_params = np.delete(self.var_params, index)
+
+    def unfix_c_i(self, index):
+        if index > self.n:
+            raise Exception("Index out of range")
+        self.var_params = np.append(self.var_params, index).sort()
+        self.var_params.sort()
+
+    def fix_beta_i(self, index, value):
+        if index > self.n:
+            raise Exception("Index out of range")
+        self.params[index + self.n] = value
+        self.var_params = np.delete(self.var_params, index + self.n)
+
+    def unfix_beta_i(self, index):
+        if index > self.n:
+            raise Exception("Index out of range")
+        self.var_params = np.append(self.var_params, index + self.n)
+        self.var_params.sort()
+
+    def fix_sigma_i(self, index, value):
+        if index > self.n:
+            raise Exception("Index out of range")
+        self.params[index + self.n * 2] = value
+        self.var_params = np.delete(self.var_params, index + self.n * 2)
+
+    def unfix_sigma_i(self, index):
+        if index > self.n:
+            raise Exception("Index out of range")
+        self.var_params = np.append(self.var_params, index + self.n * 2)
+        self.var_params.sort()
+
+    def _get_start_values(self):
+        # c0 = 1 / n, beta0 = 10, sigma0 = 1
+        return np.where(self.var_params < self.n, 1 / self.n,
+                        np.where(self.var_params < self.n * 2, 10, 1))
+
+    def _get_upper(self):
+        # c_upper = 1 , beta_upper = np.inf, sigma_upper = np.inf
+        return np.where(self.var_params < self.n, 1, np.inf)
+
+    def _get_lower(self):
+        # c_lower = 0, beta_lower = 2, sigma_lower = 0
+        return np.where(self.var_params < self.n, 0,
+                        np.where(self.var_params < self.n * 2, 2, 0))
+
+    def func(self, x, *p):
+        np.put(self.params, self.var_params, np.array(p))
+        return sum_n_pearson(x, self.params)
+
+    def fit(self, x_data, y_data):
+        return op.curve_fit(self.func, x_data, y_data,
+                            bounds=(self._get_lower(), self._get_upper()),
+                            p0=self._get_start_values())
+
+    def getparams(self):
+        return self.params
+
+
 if __name__ == "__main__":
-    x_values = np.arange(-4, 4, 0.1)
+    x_values = np.arange(-4, 4, 0.05)
     test_pearson_function()
     plot_pearson_3d(x_values, 0.75)
     plot_pearson(x_values, 2.5, 1)
-    f_meas = create_measurement(x_values)
-    fig, axs = plt.subplots(2)
+
+    f_meas = create_measurement(x_values, d=0.5, sigma1=1, sigma2=1)
+
+    _, axs = plt.subplots(2)
     axs[0].plot(x_values, f_meas, linestyle="None", marker="x")
     axs[0].set(xlim=(-3, 3), ylim=(0, 0.4), )
     axs[0].grid(True)
@@ -234,11 +313,48 @@ if __name__ == "__main__":
 
     cs = scipy.interpolate.CubicSpline(x_values, np.log(f_meas))
     axs[1].plot(x_values, cs(x_values))
-    axs[1].set(xlim=(-1, 1), ylim=(-4, -0.5),)
+    axs[1].set(xlim=(-1, 1), ylim=(-4, -0.5), )
     axs[1].grid(True)
     axs[1].set_title("Spline of measurement data")
     axs[1].set_xlabel("$x$")
     axs[1].set_ylabel("log$f(x)$")
     plt.tight_layout()
     plt.show()
+
+    n_per = 3
+    show_f_i = 1
+
+    _, axs = plt.subplots(1, n_per, figsize=(26, 8))
+    for j in range(1, n_per + 1):
+        sumNP = SumNPearson(j)
+        sumNP.fix_sigma_i(0, 1)
+        sumNP.unfix_sigma_i(0)
+        sumNP.fit(x_values, f_meas)
+        params = sumNP.getparams()
+        print("n = " + str(j) + ":")
+        print("\tsum c: " + str(sum(params[0:j])))
+        print("\tc: " + str(params[:j]))
+        print("\tbetas: " + str(params[j:2 * j]))
+        print("\tsigmas: " + str(params[2*j:]))
+
+        axs[j - 1].plot(x_values, f_meas, linestyle="None",
+                        marker="x", label="Measurements")
+        axs[j - 1].plot(x_values,
+                        sum_n_pearson(x_values, params),
+                        label="$f(x)$")
+        if show_f_i:
+            for k in range(0, j):
+                axs[j - 1].plot(x_values, params[k] *
+                                pearson_function_fast(x_values,
+                                                      params[k + j],
+                                                      params[k + 2*j]),
+                                label="$f_{}(x)$".format(str(k + 1)),
+                                linestyle="--")
+
+        axs[j - 1].set_title("n=" + str(j))
+        axs[j - 1].legend()
+
+    plt.tight_layout()
+    plt.show()
+
     print("done")
