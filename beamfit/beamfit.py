@@ -219,135 +219,267 @@ def create_measurement(x, d=0.5, sigma1=1, sigma2=1):
     return f
 
 
-def sum_n_pearson(x, par):
-    c, beta, sigma = np.split(par, 3)
+def sum_n_pearson(x, c, beta, sigma):
+    """ Calculation of a sum of pearson functions
+
+    :param x:
+    :param c:
+    :param beta:
+    :param sigma:
+    :type x: float, ndarray
+    :type c: float, ndarray
+    :type beta: float, ndarray
+    :type sigma: float, ndarray
+
+    :return: the function values
+    :rtype: float, ndarray
+    """
     return np.sum(c * pearson_function_fast(x[:, np.newaxis],
                                             beta,
                                             sigma), axis=1)
 
 
 class SumNPearson:
+    """ Class to fit a sum of pearson functions
+
+    This class helps to set up the parameters to fit a sum of pearson functions
+    to some measurement data. All parameters can be chosen to be a fix value
+    or a value that gets fitted and that starts at a certain start point
+
+        *fix_c_i - fixes a c value to a given value
+        *unfix_c_i - unfixes a c value
+        *set_startpoint_c_i - sets the start value of a c value
+        *fix_beta_i - fixes a beta value to a given value
+        *unfix_beta_i - unfixes a beta value
+        *set_startpoint_beta_i - sets the start value of a beta value
+        *fix_sigma_i - fixes a sigma value to a given value
+        *unfix_sigma_i - unfixes a sigma value
+        *set_startpoint_sigma_i - sets the start value of a sigma value
+        *fit - starts the fitting process
+        *get_cs - returns the c values
+        *get_betas - returns the beta values
+        *get_sigmas - returns the sigma values
+    """
+
     def __init__(self, n=3):
         self.n = n
-        self.params = np.empty(n * 3)
-        self.var_params = np.arange(n * 3)
+        self.cs = np.empty(n)
+        self.c_flags = np.full(n, True)
+        # last c should not be fitted
+        self.c_flags[n - 1] = False
+        self.betas = np.empty(n)
+        self.beta_flags = np.full(n, True)
+        self.sigmas = np.empty(n)
+        self.sigma_flags = np.full(n, True)
+        self.start_values = np.concatenate((np.full(n, 1 / n),
+                                            np.full(n, 10),
+                                            np.full(n, 1)))
+        self.upper = np.concatenate((np.full(n, 1),
+                                     np.full(n * 2, np.inf)))
+        self.lower = np.concatenate((np.full(n, 0),
+                                     np.full(n, 2),
+                                     np.full(n, 0)))
 
     def fix_c_i(self, index, value):
-        if index > self.n:
+        """Fixes the i-th c value to the given value
+
+        :param index: index of the fixed c
+        :param value: value which the c should be fixed to
+        :type index: int
+        :type value: float
+        """
+        # n - 1 because the last c should not be changed by the user
+        if index >= self.n - 1:
             raise Exception("Index out of range")
-        self.params[index] = value
-        self.var_params = np.delete(self.var_params, index)
+        self.cs[index] = value
+        self.c_flags[index] = False
 
     def unfix_c_i(self, index):
-        if index > self.n:
+        """Unfixes the i-th c value
+
+        :param index: index of the unfixed c
+        :type index: int
+        """
+        # n - 1 because the last c should not be changed by the user
+        if index >= self.n - 1:
             raise Exception("Index out of range")
-        self.var_params = np.append(self.var_params, index).sort()
-        self.var_params.sort()
+        self.c_flags[index] = True
+
+    def set_startpoint_c_i(self, index, value):
+        """Sets the start point of the i-th c
+        :param index: index of the c
+        :param value: value where the fitting should be started
+        :type index: int
+        :type value: float
+        """
+        # n - 1 because the last c should not be changed by the user
+        if index >= self.n - 1:
+            raise Exception("Index out of range")
+        self.start_values[index] = value
 
     def fix_beta_i(self, index, value):
-        if index > self.n:
+        """Fixes the i-th beta value to the given value
+
+        :param index: index of the fixed beta
+        :param value: value which the beta should be fixed to
+        :type index: int
+        :type value: float
+        """
+        if index >= self.n:
             raise Exception("Index out of range")
-        self.params[index + self.n] = value
-        self.var_params = np.delete(self.var_params, index + self.n)
+        self.betas[index] = value
+        self.beta_flags[index] = False
 
     def unfix_beta_i(self, index):
-        if index > self.n:
+        """Unfixes the i-th beta value
+
+        :param index: index of the unfixed beta
+        :type index: int
+        """
+        if index >= self.n:
             raise Exception("Index out of range")
-        self.var_params = np.append(self.var_params, index + self.n)
-        self.var_params.sort()
+        self.beta_flags[index] = True
+
+    def set_startpoint_beta_i(self, index, value):
+        """Sets the start point of the i-th beta
+        :param index: index of the beta
+        :param value: value where the fitting should be started
+        :type index: int
+        :type value: float
+        """
+        if index >= self.n:
+            raise Exception("Index out of range")
+        self.start_values[index + self.n] = value
 
     def fix_sigma_i(self, index, value):
-        if index > self.n:
+        """Fixes the i-th sigma value to the given value
+
+        :param index: index of the fixed sigma
+        :param value: value which the sigma should be fixed to
+        :type index: int
+        :type value: float
+        """
+        if index >= self.n:
             raise Exception("Index out of range")
-        self.params[index + self.n * 2] = value
-        self.var_params = np.delete(self.var_params, index + self.n * 2)
+        self.sigmas[index] = value
+        self.sigma_flags[index] = False
 
     def unfix_sigma_i(self, index):
-        if index > self.n:
+        """Unfixes the i-th sigma value
+
+        :param index: index of the unfixed sigma
+        :type index: int
+        """
+        if index >= self.n:
             raise Exception("Index out of range")
-        self.var_params = np.append(self.var_params, index + self.n * 2)
-        self.var_params.sort()
+        self.sigma_flags[index] = True
 
-    def _get_start_values(self):
-        # c0 = 1 / n, beta0 = 10, sigma0 = 1
-        return np.where(self.var_params < self.n, 1 / self.n,
-                        np.where(self.var_params < self.n * 2, 10, 1))
+    def set_startpoint_sigma_i(self, index, value):
+        """Sets the start point of the i-th sigma
+        :param index: index of the sigma
+        :param value: value where the fitting should be started
+        :type index: int
+        :type value: float
+        """
+        if index >= self.n:
+            raise Exception("Index out of range")
+        self.start_values[index + 2 * self.n] = value
 
-    def _get_upper(self):
-        # c_upper = 1 , beta_upper = np.inf, sigma_upper = np.inf
-        return np.where(self.var_params < self.n, 1, np.inf)
-
-    def _get_lower(self):
-        # c_lower = 0, beta_lower = 2, sigma_lower = 0
-        return np.where(self.var_params < self.n, 0,
-                        np.where(self.var_params < self.n * 2, 2, 0))
-
-    def func(self, x, *p):
-        np.put(self.params, self.var_params, np.array(p))
-        return sum_n_pearson(x, self.params)
+    def _func(self, x, *p):
+        params = np.concatenate((self.cs, self.betas, self.sigmas))
+        flags = np.concatenate((self.c_flags,
+                                self.beta_flags,
+                                self.sigma_flags))
+        params[flags] = np.array(p)
+        self.cs, self.betas, self.sigmas = np.split(params, 3)
+        self.cs[self.n - 1] = 1 - np.sum(self.cs[:self.n - 1])
+        return sum_n_pearson(x, self.cs, self.betas, self.sigmas)
 
     def fit(self, x_data, y_data):
-        return op.curve_fit(self.func, x_data, y_data,
-                            bounds=(self._get_lower(), self._get_upper()),
-                            p0=self._get_start_values())
+        """Fits the sum of pearson functions to the given data
 
-    def getparams(self):
-        return self.params
+        This method starts the fitting process with the given data. The fitted
+        parameters are stored inside the object and can be accessed with the
+        corresponding method.
+
+        :param x_data:
+        :param y_data:
+
+        :type x_data: ndarray
+        :type y_data: ndarray
+        """
+        flags = np.concatenate((self.c_flags,
+                                self.beta_flags,
+                                self.sigma_flags))
+        op.curve_fit(self._func, x_data, y_data,
+                     bounds=(self.lower[flags], self.upper[flags]),
+                     p0=self.start_values[flags])
+
+    def get_cs(self):
+        """Returns the c parameters
+        :rtype: ndarray
+        """
+        return self.cs
+
+    def get_betas(self):
+        """Returns the beta parameters
+        :rtype: ndarray
+        """
+        return self.betas
+
+    def get_sigmas(self):
+        """Returns the sigma parameters
+        :rtype: ndarray
+        """
+        return self.sigmas
 
 
 if __name__ == "__main__":
-    x_values = np.arange(-4, 4, 0.05)
+    x_values = np.arange(-4, 4, 0.5)
+    x_fine = np.arange(-4, 4, 0.01)
     test_pearson_function()
-    plot_pearson_3d(x_values, 0.75)
-    plot_pearson(x_values, 2.5, 1)
+    plot_pearson_3d(x_fine, 0.75)
+    plot_pearson(x_fine, 2.5, 1)
 
     f_meas = create_measurement(x_values, d=0.5, sigma1=1, sigma2=1)
-
-    _, axs = plt.subplots(2)
-    axs[0].plot(x_values, f_meas, linestyle="None", marker="x")
-    axs[0].set(xlim=(-3, 3), ylim=(0, 0.4), )
-    axs[0].grid(True)
-    axs[0].set_title("Measurement data")
-    axs[0].set_xlabel("$x^{exp}$")
-    axs[0].set_ylabel('$f^{exp}(x)$')
-
     cs = scipy.interpolate.CubicSpline(x_values, np.log(f_meas))
-    axs[1].plot(x_values, cs(x_values))
-    axs[1].set(xlim=(-1, 1), ylim=(-4, -0.5), )
-    axs[1].grid(True)
-    axs[1].set_title("Spline of measurement data")
-    axs[1].set_xlabel("$x$")
-    axs[1].set_ylabel("log$f(x)$")
-    plt.tight_layout()
+    _, ax_meas = plt.subplots()
+    ax_meas.plot(x_values, f_meas,
+                 linestyle="None", marker="x", label="$f^{exp}(x)$")
+    ax_meas.plot(x_fine, np.exp(cs(x_fine)), label="$f(x)$")
+    ax_meas.set_xlabel("x")
+    ax_meas.set_ylabel("f(x)")
+    ax_meas.set_title("Measurement data and the cubic spine of the given data")
+    ax_meas.legend()
     plt.show()
 
     n_per = 3
     show_f_i = 1
-
     _, axs = plt.subplots(1, n_per, figsize=(26, 8))
     for j in range(1, n_per + 1):
         sumNP = SumNPearson(j)
-        sumNP.fix_sigma_i(0, 1)
-        sumNP.unfix_sigma_i(0)
+        # sumNP.fix_beta_i(0, 4)
+        # sumNP.set_startpoint_beta_i(0, 4)
         sumNP.fit(x_values, f_meas)
-        params = sumNP.getparams()
+        cs = sumNP.get_cs()
+        betas = sumNP.get_betas()
+        sigmas = sumNP.get_sigmas()
         print("n = " + str(j) + ":")
-        print("\tsum c: " + str(sum(params[0:j])))
-        print("\tc: " + str(params[:j]))
-        print("\tbetas: " + str(params[j:2 * j]))
-        print("\tsigmas: " + str(params[2*j:]))
+        print("\tc: " + str(cs))
+        print("\tbetas: " + str(betas))
+        print("\tsigmas: " + str(sigmas))
 
         axs[j - 1].plot(x_values, f_meas, linestyle="None",
                         marker="x", label="Measurements")
-        axs[j - 1].plot(x_values,
-                        sum_n_pearson(x_values, params),
+        axs[j - 1].plot(x_fine,
+                        sum_n_pearson(x_fine, cs, betas, sigmas),
                         label="$f(x)$")
         if show_f_i:
             for k in range(0, j):
-                axs[j - 1].plot(x_values, params[k] *
-                                pearson_function_fast(x_values,
-                                                      params[k + j],
-                                                      params[k + 2*j]),
+                axs[j - 1].plot(x_fine, cs[k] *
+                                pearson_function_fast(x_fine,
+                                                      betas[k],
+                                                      sigmas[k]),
                                 label="$f_{}(x)$".format(str(k + 1)),
                                 linestyle="--")
 
