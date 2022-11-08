@@ -239,6 +239,14 @@ def sum_n_pearson(x, c, beta, sigma):
                                             sigma), axis=1)
 
 
+def create_sigma_beta_from_meas(data, x):
+    int_f = ig.simps(data, x)
+    norm_f = data / int_f
+    sigma = np.sqrt(ig.simps(norm_f * (x ** 2), x))
+    beta = (1 / (sigma ** 2)) * ig.simps(norm_f * (x ** 4), x)
+    return sigma, beta
+
+
 class SumNPearson:
     """ Class to fit a sum of pearson functions
 
@@ -261,24 +269,21 @@ class SumNPearson:
         *get_sigmas - returns the sigma values
     """
 
-    def __init__(self, n=3):
-        self.n = n
-        self.cs = np.empty(n)
-        self.c_flags = np.full(n, True)
-        # last c should not be fitted
-        self.c_flags[n - 1] = False
-        self.betas = np.empty(n)
-        self.beta_flags = np.full(n, True)
-        self.sigmas = np.empty(n)
-        self.sigma_flags = np.full(n, True)
-        self.start_values = np.concatenate((np.full(n, 1 / n),
-                                            np.full(n, 10),
-                                            np.full(n, 1)))
-        self.upper = np.concatenate((np.full(n, 1),
-                                     np.full(n * 2, np.inf)))
-        self.lower = np.concatenate((np.full(n, 0),
-                                     np.full(n, 2),
-                                     np.full(n, 0)))
+    def __init__(self, meas_data, meas_x):
+        self.meas_data = meas_data
+        self.meas_x = meas_x
+        self.n = 1
+        self.cs = np.empty(1)
+        self.c_flags = np.array([False])
+        self.betas = np.empty(1)
+        self.beta_flags = np.array([True])
+        self.sigmas = np.empty(1)
+        self.sigma_flags = np.array([True])
+        self.start_sigma, self.start_beta = create_sigma_beta_from_meas(
+            meas_data, meas_x)
+        self.start_values = np.array([0, self.start_beta, self.start_sigma])
+        self.upper = np.array([1, np.inf, np.inf])
+        self.lower = np.array([0, 2, 0])
 
     def fix_c_i(self, index, value):
         """Fixes the i-th c value to the given value
@@ -288,9 +293,10 @@ class SumNPearson:
         :type index: int
         :type value: float
         """
-        # n - 1 because the last c should not be changed by the user
-        if index >= self.n - 1:
+        if index >= self.n:
             raise Exception("Index out of range")
+        if index == 0:
+            raise Exception("Index 0 cannot be fixed")
         self.cs[index] = value
         self.c_flags[index] = False
 
@@ -300,9 +306,10 @@ class SumNPearson:
         :param index: index of the unfixed c
         :type index: int
         """
-        # n - 1 because the last c should not be changed by the user
-        if index >= self.n - 1:
+        if index >= self.n:
             raise Exception("Index out of range")
+        if index == 0:
+            raise Exception("Index 0 cannot be fixed")
         self.c_flags[index] = True
 
     def set_startpoint_c_i(self, index, value):
@@ -312,9 +319,10 @@ class SumNPearson:
         :type index: int
         :type value: float
         """
-        # n - 1 because the last c should not be changed by the user
-        if index >= self.n - 1:
+        if index >= self.n:
             raise Exception("Index out of range")
+        if index == 0:
+            raise Exception("Index 0 cannot be fitted")
         self.start_values[index] = value
 
     def fix_beta_i(self, index, value):
@@ -385,6 +393,48 @@ class SumNPearson:
             raise Exception("Index out of range")
         self.start_values[index + 2 * self.n] = value
 
+    def increase_n(self):
+        """Increases the number of pearson functions by one"""
+        self.cs = np.append(self.cs, 0)
+        self.c_flags = np.append(self.c_flags, True)
+        self.betas = np.append(self.betas, 0)
+        self.beta_flags = np.append(self.beta_flags, True)
+        self.sigmas = np.append(self.sigmas, 0)
+        self.sigma_flags = np.append(self.sigma_flags, True)
+        self.upper = np.insert(self.upper,
+                               [self.n - 1, self.n * 2 - 1, self.n * 3 - 1],
+                               [1, np.inf, np.inf])
+        self.lower = np.insert(self.lower,
+                               [self.n - 1, self.n * 2 - 1, self.n * 3 - 1],
+                               [0, 2, 0])
+        # TODO adjust the c values accordingly
+        self.start_values = np.insert(self.start_values,
+                                      [self.n - 1,
+                                       self.n * 2 - 1,
+                                       self.n * 3 - 1],
+                                      [0,
+                                       self.start_beta,
+                                       self.start_sigma])
+        self.n = self.n + 1
+
+    def decrease_n(self):
+        """Decreases the number of pearson functions by one"""
+        self.cs = self.cs[0:self.n - 1]
+        self.c_flags = self.c_flags[0:self.n - 1]
+        self.betas = self.betas[0:self.n - 1]
+        self.beta_flags = self.beta_flags[0:self.n - 1]
+        self.sigmas = self.sigmas[0:self.n - 1]
+        self.sigma_flags = self.sigma_flags[0:self.n - 1]
+        self.upper = np.delete(self.upper,
+                               [self.n - 1, self.n * 2 - 1, self.n * 3 - 1])
+        self.lower = np.delete(self.lower,
+                               [self.n - 1, self.n * 2 - 1, self.n * 3 - 1])
+        self.start_values = np.delete(self.start_values,
+                                      [self.n - 1,
+                                       self.n * 2 - 1,
+                                       self.n * 3 - 1])
+        self.n = self.n - 1
+
     def _func(self, x, *p):
         params = np.concatenate((self.cs, self.betas, self.sigmas))
         flags = np.concatenate((self.c_flags,
@@ -392,26 +442,21 @@ class SumNPearson:
                                 self.sigma_flags))
         params[flags] = np.array(p)
         self.cs, self.betas, self.sigmas = np.split(params, 3)
-        self.cs[self.n - 1] = 1 - np.sum(self.cs[:self.n - 1])
+        self.cs[0] = 1 - np.sum(self.cs[1:])
         return sum_n_pearson(x, self.cs, self.betas, self.sigmas)
 
-    def fit(self, x_data, y_data):
+    def fit(self):
         """Fits the sum of pearson functions to the given data
 
         This method starts the fitting process with the given data. The fitted
         parameters are stored inside the object and can be accessed with the
         corresponding method.
 
-        :param x_data:
-        :param y_data:
-
-        :type x_data: ndarray
-        :type y_data: ndarray
         """
         flags = np.concatenate((self.c_flags,
                                 self.beta_flags,
                                 self.sigma_flags))
-        op.curve_fit(self._func, x_data, y_data,
+        op.curve_fit(self._func, self.meas_x, self.meas_data,
                      bounds=(self.lower[flags], self.upper[flags]),
                      p0=self.start_values[flags])
 
@@ -442,6 +487,7 @@ if __name__ == "__main__":
     plot_pearson(x_fine, 2.5, 1)
 
     f_meas = create_measurement(x_values, d=0.5, sigma1=1, sigma2=1)
+
     cs = scipy.interpolate.CubicSpline(x_values, np.log(f_meas))
     _, ax_meas = plt.subplots()
     ax_meas.plot(x_values, f_meas,
@@ -456,11 +502,10 @@ if __name__ == "__main__":
     n_per = 3
     show_f_i = 1
     _, axs = plt.subplots(1, n_per, figsize=(26, 8))
+    sumNP = SumNPearson(f_meas, x_values)
+
     for j in range(1, n_per + 1):
-        sumNP = SumNPearson(j)
-        # sumNP.fix_beta_i(0, 4)
-        # sumNP.set_startpoint_beta_i(0, 4)
-        sumNP.fit(x_values, f_meas)
+        sumNP.fit()
         cs = sumNP.get_cs()
         betas = sumNP.get_betas()
         sigmas = sumNP.get_sigmas()
@@ -485,6 +530,7 @@ if __name__ == "__main__":
 
         axs[j - 1].set_title("n=" + str(j))
         axs[j - 1].legend()
+        sumNP.increase_n()
 
     plt.tight_layout()
     plt.show()
