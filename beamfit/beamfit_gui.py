@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import filedialog
 import numpy as np
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -74,18 +75,83 @@ def draw_pearson():
     cs = sumNP.get_cs()
     betas = sumNP.get_betas()
     sigmas = sumNP.get_sigmas()
+
     ax.cla()
+    ax.set_xlabel("x")
+    ax.set_ylabel("f(x)")
+    if int(semilog_lin_check.get()):
+        ax.set_yscale("log")
+
     ax.plot(x, f_meas, marker="x", linestyle="None", label="$f^{exp}(x)$")
     ax.plot(x_fine, bf.sum_n_pearson(x_fine, cs, betas, sigmas), label="$f(x)$")
-    for k in range(0, n):
-        ax.plot(x_fine,
-                cs[k] * bf.pearson_function_fast(x_fine,
-                                                 betas[k],
-                                                 sigmas[k]),
-                label="$f_{}(x)$".format(str(k + 1)),
-                linestyle="--")
-    ax.legend()
+    if int(single_func_check.get()):
+        for k in range(0, n):
+            ax.plot(x_fine,
+                    cs[k] * bf.pearson_function_fast(x_fine,
+                                                     betas[k],
+                                                     sigmas[k]),
+                    label="$f_{}(x)$".format(str(k + 1)),
+                    linestyle="--")
+
+    if int(legend_check.get()):
+        ax.legend()
+    if int(grid_check.get()):
+        ax.grid()
     canvas.draw()
+
+
+def swap_semilog_lin():
+    if int(semilog_lin_check.get()):
+        ax.set_yscale("log")
+    else:
+        ax.set_yscale("linear")
+    canvas.draw()
+
+
+def swap_legend():
+    if int(legend_check.get()):
+        ax.legend()
+    else:
+        ax.get_legend().remove()
+    canvas.draw()
+
+
+def swap_grid():
+    if int(grid_check.get()):
+        ax.grid(True)
+    else:
+        ax.grid(False)
+    canvas.draw()
+
+
+def save_function_data():
+    save_filename = filedialog.asksaveasfile(
+        filetypes=(('Comma seperated value', '.csv'),
+                   ('All files', '.*')))
+    cs = sumNP.get_cs()
+    betas = sumNP.get_betas()
+    sigmas = sumNP.get_sigmas()
+    data = np.column_stack((x_fine,
+                            bf.sum_n_pearson(x_fine, cs, betas, sigmas)))
+    np.savetxt(save_filename.name, data, delimiter=",")
+
+
+def save_parameters():
+    parameter_filename = filedialog.asksaveasfile(
+        filetypes=(('Comma seperated value', '.csv'),
+                   ('All files', '.*')))
+    cs = sumNP.get_cs()
+    betas = sumNP.get_betas()
+    sigmas = sumNP.get_sigmas()
+    parameter_data = np.column_stack((cs, betas, sigmas))
+    """
+    So apparently if I use the File and not the name of the file the last
+    20 or so lines are not saved... I don't know why I guess it has something to
+    do with the filedialog but I don't know. Could write my own file writer and
+    look into it....
+    """
+    np.savetxt(parameter_filename.name, parameter_data,
+               delimiter=",", header="c,beta,sigma", comments="")
 
 
 class ParamWidget(ttk.Frame):
@@ -144,17 +210,51 @@ rt = tk.Tk()
 rt.wm_title("Beamfit")
 rt.resizable(False, False)
 
+# Create menus
+menu = tk.Menu(rt)
+rt.config(menu=menu)
+rt.option_add('*tearOff', False)
+file_menu = tk.Menu(menu)
+graph_menu = tk.Menu(menu)
+menu.add_cascade(label="File", menu=file_menu)
+menu.add_cascade(label="Graph", menu=graph_menu)
+
+# File menu
+file_menu.add_command(label="Save fitted function", command=save_function_data)
+file_menu.add_command(label="Save parameters", command=save_parameters)
+
+# Graph menu
+semilog_lin_check = tk.StringVar()
+semilog_lin_check.set("0")
+graph_menu.add_checkbutton(label="line/semilog",
+                           command=swap_semilog_lin,
+                           variable=semilog_lin_check)
+legend_check = tk.StringVar()
+legend_check.set("0")
+graph_menu.add_checkbutton(label="Legend",
+                           command=swap_legend,
+                           variable=legend_check)
+grid_check = tk.StringVar()
+grid_check.set("0")
+graph_menu.add_checkbutton(label="Grid",
+                           command=swap_grid,
+                           variable=grid_check)
+single_func_check = tk.StringVar()
+single_func_check.set("0")
+graph_menu.add_checkbutton(label="Show single functions",
+                           command=draw_pearson,
+                           variable=single_func_check)
+
 # Create figure
 fig = Figure(figsize=(5, 4), dpi=100)
 ax = fig.add_subplot()
 ax.set_xlabel("x")
 ax.set_ylabel("f(x)")
-x = np.arange(-4, 4, 0.5)
-x_fine = np.arange(-4, 4, 0.01)
+x = np.arange(-5, 5, 0.5)
+x_fine = np.arange(-5, 5, 0.01)
 n = 1
-f_meas = bf.create_measurement(x, d=0.8, sigma1=2, sigma2=0.5)
+f_meas = bf.create_measurement(x, d=0.5, sigma1=1, sigma2=1)
 ax.plot(x, f_meas, marker="x", linestyle="None", label="$f^{exp}(x)$")
-ax.legend()
 sumNP = bf.SumNPearson(f_meas, x)
 
 # Add matplotlib inside the frame
@@ -201,7 +301,6 @@ fitted_params_field.config(state="disabled")
 fitted_params_field.pack(side="left")
 fitted_params_scroll.pack(side="right", fill="y")
 fitted_params_frame.grid(column=4, row=2, padx=(10, 10))
-
 
 rt.mainloop()
 
