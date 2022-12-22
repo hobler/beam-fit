@@ -103,7 +103,6 @@ def draw_init():
     global ax, canvas, x, f_meas
 
     ax.cla()
-    ax.cla()
     ax.set_xlabel("x")
     ax.set_ylabel("f(x)")
     ax.plot(x, f_meas, marker="x", linestyle="None", label="$f^{exp}(x)$")
@@ -133,6 +132,7 @@ def draw_pearson():
                     linestyle="--")
 
     apply_graph_options()
+    toolbar.update()
     canvas.draw()
 
 
@@ -141,6 +141,8 @@ def swap_semilog_lin():
         ax.set_yscale("log")
     else:
         ax.set_yscale("linear")
+
+    toolbar.update()
     canvas.draw()
 
 
@@ -219,6 +221,14 @@ def load_measurement_data(event=None):
     if not measurement_filename:
         print("Aborted")
         return
+
+    if sumNP is not None:
+        result = messagebox.askokcancel(title="Warning",
+                                        message="All options which are not "
+                                                "saved will be deleted! Do you "
+                                                "want to continue?")
+        if not result:
+            return
 
     load_data = np.genfromtxt(measurement_filename, delimiter=",")
     x = load_data[:, 0]
@@ -427,9 +437,9 @@ ax = fig.add_subplot()
 graph_frame = ttk.Labelframe(rt, text="Graph")
 canvas = FigureCanvasTkAgg(fig, master=graph_frame)
 
-toolbar = NavigationToolbar2Tk(canvas, graph_frame, pack_toolbar=False)
+toolbar = NavigationToolbar2Tk(canvas, graph_frame)
 toolbar.update()
-toolbar.pack(side="bottom")
+toolbar.pack(side="bottom", padx=(5, 5))
 canvas.get_tk_widget().pack(side="top", padx=(5, 5))
 graph_frame.grid(column=0, row=0, columnspan=2, rowspan=3, padx=(10, 10))
 
