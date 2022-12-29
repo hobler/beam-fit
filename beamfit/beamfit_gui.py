@@ -169,16 +169,16 @@ def open_x_options():
     tk.Entry(x_option, textvariable=x_start).pack(side="left")
     tk.Label(x_option, text="End value:").pack(side="left")
     tk.Entry(x_option, textvariable=x_end).pack(side="left")
-    tk.Label(x_option, text="Step value:").pack(side="left")
-    tk.Entry(x_option, textvariable=x_step).pack(side="left")
+    tk.Label(x_option, text="Number of steps:").pack(side="left")
+    tk.Entry(x_option, textvariable=x_num).pack(side="left")
     tk.Button(x_option, text="Save", command=change_x_options).pack(side="left")
 
 
 def change_x_options():
     global x_fine
-    x_fine = np.arange(float(x_start.get()),
-                       float(x_end.get()),
-                       float(x_step.get()))
+    x_fine = np.linspace(float(x_start.get()),
+                         float(x_end.get()),
+                         int(x_num.get()))
     draw_pearson()
 
 
@@ -198,6 +198,11 @@ def save_function_data():
 
 
 def save_parameters():
+    if sumNP is None:
+        messagebox.showwarning(
+            title="No measurement",
+            message="No measurements loaded! Please load measurement data.")
+        return
     parameter_filename = filedialog.asksaveasfilename(
         filetypes=(('Comma seperated value', '.csv'),
                    ('All files', '.*')))
@@ -214,7 +219,7 @@ def save_parameters():
 
 
 def load_measurement_data(event=None):
-    global x, f_meas, sumNP, n
+    global x, f_meas, sumNP, n, x_fine
     measurement_filename = filedialog.askopenfilename(
         filetypes=(('Comma seperated value', '.csv'),
                    ('All files', '.*')))
@@ -233,6 +238,10 @@ def load_measurement_data(event=None):
     load_data = np.genfromtxt(measurement_filename, delimiter=",")
     x = load_data[:, 0]
     f_meas = load_data[:, 1]
+    x_fine = np.linspace(np.min(x), np.max(x), np.size(x))
+    x_start.set(str(np.min(x)))
+    x_end.set(str(np.max(x)))
+    x_num.set(str(np.size(x)))
 
     sumNP = bf.SumNPearson(f_meas, x)
     while n != 1:
@@ -421,13 +430,13 @@ graph_menu.add_command(label="Change x values", command=open_x_options)
 
 # Init var
 x = None
-x_fine = np.arange(-5, 5, 0.01)
+x_fine = None
 f_meas = None
 n = 1
 sumNP: bf.SumNPearson = None
 x_start = tk.StringVar()
 x_end = tk.StringVar()
-x_step = tk.StringVar()
+x_num = tk.StringVar()
 
 # Create figure
 fig = Figure(figsize=(5, 4), dpi=100)
