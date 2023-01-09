@@ -70,12 +70,9 @@ def pearson_function_fast(x, beta, sigma):
     beta_san = np.where(np.equal(beta, 3), 0, beta)
     m = np.where(beta_eq_3, 0, (5 * beta_san - 9) / (6 - 2 * beta_san))
 
-    a = np.where(beta_eq_3, np.sqrt(2) * sigma,
-                 sigma * np.sqrt(np.where(
-                     beta_gt_3,
-                     np.abs(2 * m + 3),
-                     2 * m + 3))
-                 )
+    a = sigma * np.sqrt(np.where(beta_eq_3, 2, np.where(beta_gt_3,
+                                                        np.abs(2 * m + 3),
+                                                        2 * m + 3)))
 
     beta_func = np.where(beta_between_2_3, sc.beta(0.5, m + 0.5),
                          np.where(beta_gt_3, sc.beta(0.5, np.abs(m)), 0))
@@ -89,7 +86,7 @@ def pearson_function_fast(x, beta, sigma):
         f = np.where(beta_between_2_3,
                      ((m + 0.5) / (np.pi * a))
                      * beta_func * ((1 - san_fract) ** m),
-                     np.where(beta_eq_3, (1 / ((np.pi ** 2) * a))
+                     np.where(beta_eq_3, (1 / ((np.sqrt(np.pi)) * a))
                               * np.exp(-san_fract),
                               np.where(beta_gt_3,
                                        (np.abs(m + 0.5) / (np.pi * a))

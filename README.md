@@ -50,14 +50,14 @@ work from the last session.
 This is a brief summary of the option menus
 
 #### File:
+* **Load measurement data**: Loads **.csv** file with measurement data
+* **Load options**: Loads options file from previous session
 * **Save fitted function**: Saves fitted function as **.csv** file
 * **Save parameters**: Saves parameters as **.csv** file
 * **Save options**: Saves fitting options as **.json** file
-* **Load measurement data**: Loads **.csv** file with measurement data
-* **Load options**: Loads options file from previous session
 
 #### Graph:
-* **line/semilog**: swaps between linear and semi-logarithmic representation
+* **Semilog**: swaps between linear and semi-logarithmic representation
 * **Legend**: turns on and off the legend
-* **Show single functions**: Shows or hides all the individual pearson functions
+* **Individual functions**: Shows or hides all the individual pearson functions
 * **Change x values**: Opens window to change the x values which are used to plot the fitted function

@@ -14,13 +14,7 @@ import json
 def increase_n():
     global n
 
-    if sumNP is None:
-        messagebox.showwarning(
-            title="No measurement",
-            message="No measurements loaded! Please load measurement data.")
-        return
     n += 1
-    n_text.set("n: " + str(n))
     sumNP.increase_n()
     func_widget = FuncParamWidget(rt)
     param_widgets.append(func_widget)
@@ -32,14 +26,29 @@ def increase_n():
 
 def decrease_n():
     global n
+
     if n > 1:
         n -= 1
-        n_text.set("n: " + str(n))
         param_note.forget(param_widgets.pop())
         sumNP.decrease_n()
 
 
+def n_changed():
+    if sumNP is None:
+        n_spinbox.selection_clear()
+        messagebox.showwarning(
+            title="No measurement",
+            message="No measurements loaded! Please load measurement data.")
+        return
+
+    if n > int(n_spinbox.get()):
+        decrease_n()
+    elif n < int(n_spinbox.get()):
+        increase_n()
+
+
 def print_fitted_params():
+    """Prints the fitted parameters in the field in the bottom right"""
     cs = sumNP.get_cs()
     betas = sumNP.get_betas()
     sigmas = sumNP.get_sigmas()
@@ -56,6 +65,7 @@ def print_fitted_params():
 
 
 def fit():
+    """Starts the fitting process when the fit button is pressed"""
     if sumNP is None:
         messagebox.showwarning(
             title="No measurement",
@@ -91,6 +101,7 @@ def fit():
 
 
 def apply_graph_options():
+    """Applies all graphic options for the graph """
     if int(semilog_lin_check.get()):
         ax.set_yscale("log")
     if int(legend_check.get()):
@@ -100,6 +111,7 @@ def apply_graph_options():
 
 
 def draw_init():
+    """Initializes the graph """
     global ax, canvas, x, f_meas
 
     ax.cla()
@@ -111,7 +123,12 @@ def draw_init():
 
 
 def draw_pearson():
+    """Draws the fitted function, measurement data and the single functions"""
     global ax, canvas, sumNP, f_meas, x, x_fine, n
+
+    if sumNP is None:
+        return
+
     cs = sumNP.get_cs()
     betas = sumNP.get_betas()
     sigmas = sumNP.get_sigmas()
@@ -163,15 +180,18 @@ def swap_grid():
 
 
 def open_x_options():
+    """Opens a window to change the x values"""
     x_option = tk.Toplevel(rt)
     x_option.title("X value options")
-    tk.Label(x_option, text="Start value:").pack(side="left")
-    tk.Entry(x_option, textvariable=x_start).pack(side="left")
-    tk.Label(x_option, text="End value:").pack(side="left")
-    tk.Entry(x_option, textvariable=x_end).pack(side="left")
-    tk.Label(x_option, text="Number of steps:").pack(side="left")
-    tk.Entry(x_option, textvariable=x_num).pack(side="left")
-    tk.Button(x_option, text="Save", command=change_x_options).pack(side="left")
+    tk.Label(x_option, text="Start value:").grid(column=0, row=0)
+    tk.Entry(x_option, textvariable=x_start).grid(column=1, row=0)
+    tk.Label(x_option, text="End value:").grid(column=0, row=1)
+    tk.Entry(x_option, textvariable=x_end).grid(column=1, row=1)
+    tk.Label(x_option, text="Number of steps:").grid(column=0, row=2)
+    tk.Entry(x_option, textvariable=x_num).grid(column=1, row=2)
+    tk.Button(x_option,
+              text="Save",
+              command=change_x_options).grid(column=0, row=3, columnspan=2)
 
 
 def change_x_options():
@@ -183,6 +203,7 @@ def change_x_options():
 
 
 def save_function_data():
+    """Opens a dialog to save the fitted function data in a csv file"""
     save_filename = filedialog.asksaveasfilename(
         filetypes=(('Comma seperated value', '.csv'),
                    ('All files', '.*')))
@@ -198,6 +219,7 @@ def save_function_data():
 
 
 def save_parameters():
+    """Opens a dialog to save the fitted parameters in a csv file """
     if sumNP is None:
         messagebox.showwarning(
             title="No measurement",
@@ -219,6 +241,7 @@ def save_parameters():
 
 
 def load_measurement_data(event=None):
+    """Opens a dialog to load in the measurement data """
     global x, f_meas, sumNP, n, x_fine
     measurement_filename = filedialog.askopenfilename(
         filetypes=(('Comma seperated value', '.csv'),
@@ -247,17 +270,21 @@ def load_measurement_data(event=None):
     while n != 1:
         param_note.forget(param_widgets.pop())
         n -= 1
-    n_text.set("n: 1")
+    n_spinbox.config(state="readonly")
+    n_spin_value.set(1)
     fitted_params_field.config(state="normal")
     fitted_params_field.delete(1.0, tk.END)
     fitted_params_field.insert(tk.END, "No fitted params yet")
     fitted_params_field.config(state="disabled")
     param_widgets[0].beta_param.set_value(sumNP.start_beta)
     param_widgets[0].sigma_param.set_value(sumNP.start_sigma)
+    param_widgets[0].sigma_param.set_fixed(False)
+    param_widgets[0].beta_param.set_fixed(False)
     draw_init()
 
 
 def save_json():
+    """Saves all the parameter options in a json file """
     option_filename = filedialog.asksaveasfilename(
         filetypes=(('JavaScript Object Notation', '.json'),
                    ('All files', '.*')))
@@ -283,6 +310,7 @@ def save_json():
 
 
 def load_json():
+    """Loads and parses the parameter options out of a json file """
     if sumNP is None:
         messagebox.showwarning(
             title="No measurement",
@@ -323,10 +351,11 @@ def load_json():
 
 
 class ParamWidget(ttk.Frame):
+    """Widget which is used to get the value of a parameter and if its fixed"""
     def __init__(self, parent, param_name):
         ttk.Frame.__init__(self, parent)
 
-        self.value_label = ttk.Label(self, text=param_name+str(" value:"))
+        self.value_label = ttk.Label(self, text=param_name+str(": "))
         self.value = ttk.Entry(self)
         self.value_label.pack(side="left")
         self.value.pack(side="left")
@@ -352,12 +381,13 @@ class ParamWidget(ttk.Frame):
 
 
 class FuncParamWidget(ttk.Frame):
+    """Widget to combine the three parameters for a pearson function """
     def __init__(self, parent):
         ttk.Frame.__init__(self, parent)
-        self.sigma_param = ParamWidget(self, "sigma")
-        self.sigma_param.pack(side="bottom")
         self.beta_param = ParamWidget(self, "beta")
         self.beta_param.pack(side="bottom")
+        self.sigma_param = ParamWidget(self, "sigma")
+        self.sigma_param.pack(side="bottom")
         self.c_param = ParamWidget(self, "c")
         self.c_param.pack(side="bottom")
 
@@ -399,20 +429,23 @@ menu.add_cascade(label="File", menu=file_menu)
 menu.add_cascade(label="Graph", menu=graph_menu)
 
 # File menu
-file_menu.add_command(label="Save fitted function", command=save_function_data)
-file_menu.add_command(label="Save parameters", command=save_parameters)
-file_menu.add_command(label="Save options", command=save_json)
 file_menu.add_command(label="Load measurement data",
                       command=load_measurement_data, accelerator="Ctrl+O")
 file_menu.bind_all("<Control-o>", load_measurement_data)
 file_menu.add_command(label="Load options", command=load_json)
+file_menu.add_separator()
+file_menu.add_command(label="Save fitted function", command=save_function_data)
+file_menu.add_command(label="Save parameters", command=save_parameters)
+file_menu.add_command(label="Save options", command=save_json)
+
 
 # Graph menu
 semilog_lin_check = tk.IntVar()
-graph_menu.add_checkbutton(label="line/semilog",
+graph_menu.add_checkbutton(label="Semilog",
                            command=swap_semilog_lin,
                            variable=semilog_lin_check)
 legend_check = tk.IntVar()
+legend_check.set(1)
 graph_menu.add_checkbutton(label="Legend",
                            command=swap_legend,
                            variable=legend_check)
@@ -421,7 +454,7 @@ graph_menu.add_checkbutton(label="Grid",
                            command=swap_grid,
                            variable=grid_check)
 single_func_check = tk.IntVar()
-graph_menu.add_checkbutton(label="Show single functions",
+graph_menu.add_checkbutton(label="Individual functions",
                            command=draw_pearson,
                            variable=single_func_check)
 
@@ -450,27 +483,33 @@ toolbar = NavigationToolbar2Tk(canvas, graph_frame)
 toolbar.update()
 toolbar.pack(side="bottom", padx=(5, 5))
 canvas.get_tk_widget().pack(side="top", padx=(5, 5))
-graph_frame.grid(column=0, row=0, columnspan=2, rowspan=3, padx=(10, 10))
+graph_frame.grid(column=0, row=0, columnspan=2, rowspan=4, padx=(10, 10))
 
 # Add the number of func control inside the frame
-n_text = tk.StringVar()
-n_text.set("n: 1")
 n_frame = ttk.Frame(rt)
-n_label = ttk.Label(n_frame, text="n: 1", textvariable=n_text)
+n_label = ttk.Label(n_frame, text="n: ")
 n_label.pack(side="left")
-n_decrease_bt = ttk.Button(n_frame, text='<', command=decrease_n)
-n_decrease_bt.pack(side="left")
-n_increase_bt = ttk.Button(n_frame, text='>', command=increase_n)
-n_increase_bt.pack(side="left")
+n_spin_value = tk.IntVar()  # This is only needed to reset the spinbox
+n_spinbox = tk.Spinbox(n_frame, from_=1, to=99, state="disabled",
+                       highlightthickness=0,
+                       command=n_changed,
+                       textvariable=n_spin_value,
+                       width=3)
+n_spinbox.pack(side="left")
 n_frame.grid(column=4, row=0)
+
 
 # Add fit button inside the frame
 fit_bt = ttk.Button(rt, text='Fit', command=fit)
 fit_bt.grid(column=4, row=3, pady=(5, 5))
 
 # Add function params
-param_note = ttk.Notebook(rt)
-param_note.grid(column=4, row=1)
+param_frame = ttk.LabelFrame(rt, text="Initial Parameters",
+                             width=340, height=110)
+param_frame.pack_propagate(False)
+param_note = ttk.Notebook(param_frame)
+param_note.pack(anchor="n", fill="both", expand=True)
+param_frame.grid(column=4, row=1)
 param_widgets = [FuncParamWidget(rt)]
 param_widgets[0].c_param.destroy()
 param_note.add(param_widgets[0], text=str(n))
