@@ -59,9 +59,27 @@ def print_fitted_params():
         fitted_params_field.insert(tk.END,
                                    "Func " + str(i + 1) + ":\n"
                                    + "\tc: " + str(cs[i])
-                                   + "\n\tbeta: " + str(betas[i])
-                                   + "\n\tsigma: " + str(sigmas[i]) + "\n\n")
+                                   + "\n\tsigma: " + str(sigmas[i])
+                                   + "\n\tbeta: " + str(betas[i]) + "\n\n")
     fitted_params_field.config(state="disabled")
+
+
+def use_fitted_params():
+    if sumNP is None:
+        messagebox.showwarning(
+            title="No measurement",
+            message="No measurements loaded! Please load measurement data.")
+        return
+
+    cs = sumNP.get_cs()
+    sigmas = sumNP.get_sigmas()
+    betas = sumNP.get_betas()
+
+    for i, paramW in enumerate(param_widgets):
+        if i != 0:
+            paramW.c_param.set_value(cs[i])
+        paramW.sigma_param.set_value(sigmas[i])
+        paramW.beta_param.set_value(betas[i])
 
 
 def fit():
@@ -483,7 +501,8 @@ toolbar = NavigationToolbar2Tk(canvas, graph_frame)
 toolbar.update()
 toolbar.pack(side="bottom", padx=(5, 5))
 canvas.get_tk_widget().pack(side="top", padx=(5, 5))
-graph_frame.grid(column=0, row=0, columnspan=2, rowspan=4, padx=(10, 10))
+graph_frame.grid(column=0, row=0, columnspan=2, rowspan=4,
+                 padx=(10, 10), pady=(10, 10))
 
 # Add the number of func control inside the frame
 n_frame = ttk.Frame(rt)
@@ -500,8 +519,15 @@ n_frame.grid(column=4, row=0)
 
 
 # Add fit button inside the frame
-fit_bt = ttk.Button(rt, text='Fit', command=fit)
-fit_bt.grid(column=4, row=3, pady=(5, 5))
+buttons_frame = ttk.Frame(rt)
+fit_bt = ttk.Button(buttons_frame, text='Fit', command=fit)
+fit_bt.pack(side="left", padx=(5, 5))
+
+use_fitted_params_button = ttk.Button(buttons_frame,
+                                      text='Use fitted parameters',
+                                      command=use_fitted_params)
+use_fitted_params_button.pack(side="right", padx=(5, 5))
+buttons_frame.grid(column=4, row=3, pady=(5, 5))
 
 # Add function params
 param_frame = ttk.LabelFrame(rt, text="Initial Parameters",

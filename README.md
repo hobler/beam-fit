@@ -34,9 +34,10 @@ it gets added. Their start value for the fitting can be changed by changing the
 value in the corresponding field of the parameter. By checking the box on 
 the right of the parameter, the parameter gets fixed and the value in the field
 is now the fixed value. After changing the parameter options the fitting can be
-started with the **Fit** button in the bottom right corner. When the fitting is
+started with the "**Fit**" button in the bottom right corner. When the fitting is
 completed the fitted parameters will appear in the field below the parameter 
-options.
+options. If needed the newly fitted parameters can be used as the new initial 
+parameters with the "**Use fitted parameters**" button.
 ### How to save
 The result of the fitting can be saved in many ways. The function values can be
 saved through the **File** menu. These will be saved as a **.csv** file. Also, 
