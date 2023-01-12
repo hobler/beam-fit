@@ -351,6 +351,9 @@ def load_json():
             else:
                 increase_n()
 
+        # Set the spinbox to the current n value to make it coherent
+        n_spin_value.set(n)
+
         for i, params in enumerate(function_params):
             if i != 0:
                 param_widgets[i].c_param.set_value(params["c"]["value"])
