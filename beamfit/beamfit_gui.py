@@ -10,6 +10,9 @@ from matplotlib.figure import Figure
 import beamfit as bf
 import json
 
+# Used to add the widgets to the param notebook with padding
+FUNC_PARAM_PADDING = (3, 3)
+
 
 def increase_n():
     global n
@@ -19,7 +22,7 @@ def increase_n():
     func_widget = FuncParamWidget(rt)
     param_widgets.append(func_widget)
     func_widget.set_start_values(sumNP)
-    param_note.add(func_widget, text=str(n))
+    param_note.add(func_widget, text=str(n), padding=FUNC_PARAM_PADDING)
     # Change to new tab
     param_note.select(n-1)
 
@@ -533,15 +536,21 @@ use_fitted_params_button.pack(side="right", padx=(5, 5))
 buttons_frame.grid(column=4, row=3, pady=(5, 5))
 
 # Add function params
-param_frame = ttk.LabelFrame(rt, text="Initial Parameters",
-                             width=340, height=110)
-param_frame.pack_propagate(False)
+param_frame = ttk.LabelFrame(rt, text="Initial Parameters")
 param_note = ttk.Notebook(param_frame)
 param_note.pack(anchor="n", fill="both", expand=True)
 param_frame.grid(column=4, row=1)
 param_widgets = [FuncParamWidget(rt)]
+param_note.add(param_widgets[0], text=str(n), padding=FUNC_PARAM_PADDING)
+
+# Set the frame size to the size of the notebook with c parameter
+param_frame.config(width=param_note.winfo_width(),
+                   height=param_note.winfo_height())
+param_frame.update()
+param_frame.pack_propagate(False)
+
+# Destroy c of the first element afterwards, so it has the size of 3 parameters
 param_widgets[0].c_param.destroy()
-param_note.add(param_widgets[0], text=str(n))
 
 # Add output of the fitted parameters for quick access
 fitted_params_frame = ttk.Labelframe(rt, text="Fitted parameters")
