@@ -79,8 +79,7 @@ def use_fitted_params():
     betas = sumNP.get_betas()
 
     for i, paramW in enumerate(param_widgets):
-        if i != 0:
-            paramW.c_param.set_value(cs[i])
+        paramW.c_param.set_value(cs[i])
         paramW.sigma_param.set_value(sigmas[i])
         paramW.beta_param.set_value(betas[i])
 
@@ -94,12 +93,11 @@ def fit():
         return
     try:
         for i, paramW in enumerate(param_widgets):
-            if i != 0:
-                if paramW.is_c_fixed():
-                    sumNP.fix_c_i(i, paramW.get_c_value())
-                else:
-                    sumNP.unfix_c_i(i)
-                    sumNP.set_startpoint_c_i(i, paramW.get_c_value())
+            if paramW.is_c_fixed():
+                sumNP.fix_c_i(i, paramW.get_c_value())
+            else:
+                sumNP.unfix_c_i(i)
+                sumNP.set_startpoint_c_i(i, paramW.get_c_value())
             if paramW.is_beta_fixed():
                 sumNP.fix_beta_i(i, paramW.get_beta_value())
             else:
@@ -297,8 +295,8 @@ def load_measurement_data(event=None):
     fitted_params_field.delete(1.0, tk.END)
     fitted_params_field.insert(tk.END, "No fitted params yet")
     fitted_params_field.config(state="disabled")
-    param_widgets[0].beta_param.set_value(sumNP.start_beta)
-    param_widgets[0].sigma_param.set_value(sumNP.start_sigma)
+    param_widgets[0].set_start_values(sumNP)
+    param_widgets[0].c_param.set_fixed(False)
     param_widgets[0].sigma_param.set_fixed(False)
     param_widgets[0].beta_param.set_fixed(False)
     draw_init()
@@ -311,12 +309,9 @@ def save_json():
                    ('All files', '.*')))
     if not option_filename:
         return
-    func_params = [{"beta": {"value": param_widgets[0].get_beta_value(),
-                             "fixed": param_widgets[0].is_beta_fixed()},
-                    "sigma": {"value": param_widgets[0].get_sigma_value(),
-                              "fixed": param_widgets[0].is_sigma_fixed()}}]
 
-    for i in range(1, n):
+    func_params = []
+    for i in range(0, n):
         func_params.append(
             {"c": {"value": param_widgets[i].get_c_value(),
                    "fixed": param_widgets[i].is_c_fixed()},
@@ -358,9 +353,8 @@ def load_json():
         n_spin_value.set(n)
 
         for i, params in enumerate(function_params):
-            if i != 0:
-                param_widgets[i].c_param.set_value(params["c"]["value"])
-                param_widgets[i].c_param.set_fixed(params["c"]["fixed"])
+            param_widgets[i].c_param.set_value(params["c"]["value"])
+            param_widgets[i].c_param.set_fixed(params["c"]["fixed"])
             param_widgets[i].beta_param.set_value(params["beta"]["value"])
             param_widgets[i].beta_param.set_fixed(params["beta"]["fixed"])
             param_widgets[i].sigma_param.set_value(params["sigma"]["value"])
@@ -548,9 +542,6 @@ param_frame.config(width=param_note.winfo_width(),
                    height=param_note.winfo_height())
 param_frame.update()
 param_frame.pack_propagate(False)
-
-# Destroy c of the first element afterwards, so it has the size of 3 parameters
-param_widgets[0].c_param.destroy()
 
 # Add output of the fitted parameters for quick access
 fitted_params_frame = ttk.Labelframe(rt, text="Fitted parameters")

@@ -271,7 +271,7 @@ class SumNPearson:
         self.meas_x = meas_x
         self.n = 1
         self.cs = np.empty(1)
-        self.c_flags = np.array([False])
+        self.c_flags = np.array([True])
         self.betas = np.empty(1)
         self.beta_flags = np.array([True])
         self.sigmas = np.empty(1)
@@ -279,7 +279,7 @@ class SumNPearson:
         self.start_sigma, self.start_beta = create_sigma_beta_from_meas(
             meas_data, meas_x)
         self.start_values = np.array([0, self.start_beta, self.start_sigma])
-        self.upper = np.array([1, np.inf, np.inf])
+        self.upper = np.array([np.inf, np.inf, np.inf])
         self.lower = np.array([0, 2, 0])
 
     def fix_c_i(self, index, value):
@@ -292,8 +292,7 @@ class SumNPearson:
         """
         if index >= self.n:
             raise Exception("Index out of range")
-        if index == 0:
-            raise Exception("Index 0 cannot be fixed")
+
         self.cs[index] = value
         self.c_flags[index] = False
 
@@ -305,8 +304,7 @@ class SumNPearson:
         """
         if index >= self.n:
             raise Exception("Index out of range")
-        if index == 0:
-            raise Exception("Index 0 cannot be fixed")
+
         self.c_flags[index] = True
 
     def set_startpoint_c_i(self, index, value):
@@ -318,8 +316,7 @@ class SumNPearson:
         """
         if index >= self.n:
             raise Exception("Index out of range")
-        if index == 0:
-            raise Exception("Index 0 cannot be fitted")
+
         self.start_values[index] = value
 
     def fix_beta_i(self, index, value):
@@ -400,7 +397,7 @@ class SumNPearson:
         self.sigma_flags = np.append(self.sigma_flags, True)
         self.upper = np.insert(self.upper,
                                [self.n - 1, self.n * 2 - 1, self.n * 3 - 1],
-                               [1, np.inf, np.inf])
+                               [np.inf, np.inf, np.inf])
         self.lower = np.insert(self.lower,
                                [self.n - 1, self.n * 2 - 1, self.n * 3 - 1],
                                [0, 2, 0])
@@ -439,7 +436,6 @@ class SumNPearson:
                                 self.sigma_flags))
         params[flags] = np.array(p)
         self.cs, self.betas, self.sigmas = np.split(params, 3)
-        self.cs[0] = 1 - np.sum(self.cs[1:])
         return sum_n_pearson(x, self.cs, self.betas, self.sigmas)
 
     def fit(self):
